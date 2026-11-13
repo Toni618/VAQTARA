@@ -1,0 +1,23 @@
+{
+  "name": "ravendora",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RAVENDORA - Intelligent Personal Productivity Platform",
+  "workspaces": [
+    "backend",
+    "admin-dashboard",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:admin": "npm --workspace admin-dashboard run dev",
+    "build:backend": "npm --workspace backend run build",
+    "build:admin": "npm --workspace admin-dashboard run build",
+    "test:backend": "npm --workspace backend run test",
+    "lint": "echo \"Run workspace linters individually\"",
+    "typecheck": "echo \"Run workspace typechecks individually\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

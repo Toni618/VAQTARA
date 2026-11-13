@@ -1,0 +1,400 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum Language {
+  FA
+  EN
+}
+
+enum CalendarSystem {
+  GREGORIAN
+  JALALI
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  username            String             @unique
+  email               String?            @unique
+  passwordHash        String
+  role                UserRole           @default(USER)
+  status              AccountStatus      @default(ACTIVE)
+  displayName         String?
+  preferredLanguage   Language           @default(FA)
+  timeZone            String?
+  calendarSystem      CalendarSystem     @default(JALALI)
+  trialActivatedAt    DateTime?
+  trialExpiresAt      DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  lastLoginAt         DateTime?
+
+  profile             Profile?
+  preferences         Preferences?
+  sessions            DeviceSession[]
+  tasks               Task[]
+  projects            Project[]
+  goals               Goal[]
+  habits              Habit[]
+  calendarEvents      CalendarEvent[]
+  notifications       Notification[]
+  studySchedules      StudySchedule[]
+  workSchedules       WorkSchedule[]
+  focusSessions       FocusSession[]
+  achievements        UserAchievement[]
+  subscriptions       Subscription[]
+  payments            Payment[]
+  auditLogs           AuditLog[]         @relation("UserAuditLogs")
+  adminAuditLogs      AuditLog[]         @relation("AdminAuditLogs")
+  tags                Tag[]
+  notes               Note[]
+}
+
+model Profile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  occupation        String?
+  interests         String[]
+  personalGoals     String[]
+  educationLevel    String?
+  institutionName   String?
+  planningStyle     String?
+  onboardingDone    Boolean  @default(false)
+  onboardingData    Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Preferences {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  notificationPrefs     Json?
+  themePrefs            Json?
+  reducedMotion         Boolean  @default(false)
+  privacyPrefs          Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DeviceSession {
+  id             String   @id @default(cuid())
+  userId         String
+  refreshTokenHash String
+  deviceLabel    String?
+  userAgent      String?
+  ipAddress      String?
+  revokedAt      DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  userId        String
+  projectId     String?
+  parentTaskId  String?
+  title         String
+  description   String?
+  status        TaskStatus   @default(TODO)
+  priority      TaskPriority @default(MEDIUM)
+  dueAt         DateTime?
+  startAt       DateTime?
+  estimatedMin  Int?
+  actualMin     Int?
+  isRecurring   Boolean      @default(false)
+  recurrence    Json?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentTask    Task?        @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks      Task[]       @relation("TaskSubtasks")
+  tags          TaskTag[]
+
+  @@index([userId, status, dueAt])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  color       String?
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([userId])
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  targetDate  DateTime?
+  progress    Int      @default(0)
+  status      String   @default("active")
+  milestones  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Habit {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String
+  description   String?
+  schedule      Json?
+  streakCount   Int      @default(0)
+  bestStreak    Int      @default(0)
+  lastDoneAt    DateTime?
+  history       Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean  @default(false)
+  source      String   @default("local")
+  externalId  String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String?
+  title       String
+  body        String
+  type        String
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  readAt      DateTime?
+  payload     Json?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledAt])
+}
+
+model StudySchedule {
+  id          String   @id @default(cuid())
+  userId      String
+  institution String?
+  items       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkSchedule {
+  id          String   @id @default(cuid())
+  userId      String
+  items       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FocusSession {
+  id          String   @id @default(cuid())
+  userId      String
+  mode        String
+  startedAt   DateTime
+  endedAt     DateTime?
+  durationMin Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  titleFa     String
+  titleEn     String
+  descriptionFa String?
+  descriptionEn String?
+  criteria    Json?
+  createdAt   DateTime @default(now())
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model SubscriptionPlan {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  priceAmount   Int
+  currency      String   @default("USD")
+  interval      String
+  isActive      Boolean  @default(true)
+  features      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                String             @id @default(cuid())
+  userId            String
+  planId            String?
+  status            SubscriptionStatus @default(NONE)
+  provider          String?
+  providerSubId     String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean           @default(false)
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan              SubscriptionPlan?  @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  subscriptionId  String?
+  provider        String
+  providerTxnId   String?
+  amount          Int
+  currency        String
+  status          String
+  verifiedAt      DateTime?
+  idempotencyKey  String?  @unique
+  rawPayload      Json?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  targetUserId String?
+  action      String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("UserAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target      User?    @relation("AdminAuditLogs", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     TaskTag[]
+
+  @@unique([userId, name])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  content   String
+  type      String   @default("note")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+}
